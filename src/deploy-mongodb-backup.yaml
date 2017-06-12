@@ -1,0 +1,95 @@
+heat_template_version: 2015-04-30
+description: Installs MongoDB Backup
+
+parameters:
+
+  server_map:
+    type: json
+    description: Map of servers to be used with OS::Heat::SoftwareDeploymentGroup
+
+  server_list:
+    type: comma_delimited_list
+    description: List of server IDs
+
+  server_names:
+    type: comma_delimited_list
+    description: List of server names
+
+  http_proxy:
+    type: string
+    description: "HTTP proxy URL"
+    default: ''
+
+  https_proxy:
+    type: string
+    description: "HTTPS proxy URL"
+    default: ''
+
+  no_proxy:
+    type: string
+    description: "Exceptions to proxy configuration"
+    default: ''
+
+  backup_period:
+    type: string
+    default: daily
+    constraints:
+      - allowed_values:
+          - hourly
+          - daily
+          - weekly
+          - monthly
+
+  admin_user:
+    type: string
+    default: admin
+
+  admin_pass:
+    type: string
+    hidden: true
+
+  backup_dir:
+    type: string
+    default: "/tmp"
+
+  mongodb_servers:
+    type: comma_delimited_list
+
+  mongodb_port:
+    type: number
+    default: 27017
+
+resources:
+
+  # SOFTWARE CONFIGS
+
+  install_backup:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/install_backup_cron.sh }
+      inputs:
+        - name: BACKUP_PERIOD
+        - name: ADMIN_USER
+        - name: ADMIN_PASS
+        - name: BACKUP_DIR
+        - name: SERVERS
+          type: CommaDelimitedList
+        - name: PORT
+
+  # SOFTWARE DEPLOYMENTS
+
+  deploy_install_backup:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: install_backup }
+      servers: { get_param: server_map }
+      input_values:
+        BACKUP_PERIOD: { get_param: backup_period }
+        ADMIN_USER: { get_param: admin_user }
+        ADMIN_PASS: { get_param: admin_pass }
+        BACKUP_DIR: { get_param: backup_dir }
+        SERVERS: { get_param: mongodb_servers }
+        PORT: { get_param: mongodb_port }
+
+outputs:

@@ -1,0 +1,129 @@
+heat_template_version: 2015-10-15
+
+parameter_groups:
+
+parameters:
+
+  key:
+    type: string
+    constraints:
+      - custom_constraint: nova.keypair
+
+  image:
+    type: string
+    constraints:
+      - custom_constraint: glance.image
+
+  flavor:
+    type: string
+    constraints:
+      - custom_constraint: nova.flavor
+
+  public_network:
+    type: string
+    constraints:
+      - custom_constraint: neutron.network
+
+  dns_nameservers:
+    type: comma_delimited_list
+    description: List of DNS servers
+    default:
+      - 8.8.8.8
+
+  name:
+    type: string
+    default: mongodb
+
+resources:
+
+  router:
+    type: OS::Neutron::Router
+    properties:
+      name: { get_param: name }
+      external_gateway_info:
+        network: { get_param: public_network }
+
+  simple_networking1:
+    type: Evoila::IaaS::NetworkLayout::Simple
+    properties:
+      name: { get_param: name }
+      network_cidr: 192.168.0.0/24
+      router: { get_resource: router }
+      dns_nameservers: { get_param: dns_nameservers }
+
+  security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { get_param: name }
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+
+  cluster:
+    type: Evoila::IaaS::Cluster::Basic
+    properties:
+      count: 3
+      signals: 3
+      name: { get_param: name }
+      key: { get_param: key }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      security_groups:
+        - { get_resource: security_group }
+      subnets:
+        - { get_attr: [simple_networking1, subnet] }
+      timeout: 500
+      extras:
+        volume_count: 0
+        volume_size: 0
+
+  hosts_file:
+    type: Evoila::Deployment::HostsFile
+    properties:
+      server_map: { get_attr: [ cluster, attributes_id ] }
+      server_addresses: { get_attr: [ cluster, first_addresses ] }
+      server_names: { get_attr: [ cluster, names ] }
+
+  mongodb:
+    type: Evoila::Deployment::MongoDB
+    properties:
+      server_map: { get_attr: [ cluster, attributes_id ] }
+      server_list: { get_attr: [ cluster, ids ] }
+      server_names: { get_attr: [ cluster, names ] }
+    depends_on:
+      - hosts_file
+
+  backup:
+    type: Evoila::Deployment::MongoDB::Backup
+    properties:
+      server_map: { get_attr: [ cluster, attributes_id ] }
+      server_list: { get_attr: [ cluster, ids ] }
+      server_names: { get_attr: [ cluster, names ] }
+      backup_period: daily
+      admin_user: admin
+      admin_pass: { get_attr: [ mongodb, admin_password ] }
+      backup_dir: "/tmp"
+      mongodb_servers: { get_attr: [ cluster, first_addresses ] }
+      mongodb_port: 27017
+    depends_on:
+      - mongodb
+
+  user:
+    type: Evoila::Deployment::MongoDB::User
+    properties:
+      server_map: { get_attr: [ cluster, attributes_id ] }
+      server_list: { get_attr: [ cluster, ids ] }
+      server_names: { get_attr: [ cluster, names ] }
+      mongodb_port: 27017
+      admin_user: admin
+      admin_pass: { get_attr: [ mongodb, admin_password ] }
+      database: foo
+      username: bar
+      password: test123
+      roles:
+        - readWrite
+        - dbAdmin
+
+outputs:
+
+  admin_password:
+    value: { get_attr: [ mongodb, admin_password ] }

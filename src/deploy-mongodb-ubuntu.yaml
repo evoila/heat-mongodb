@@ -1,0 +1,211 @@
+heat_template_version: 2015-04-30
+description: Installs MongoDB
+
+parameters:
+
+  server_map:
+    type: json
+    description: Map of servers to be used with OS::Heat::SoftwareDeploymentGroup
+
+  server_list:
+    type: comma_delimited_list
+    description: List of server IDs
+
+  server_names:
+    type: comma_delimited_list
+    description: List of server names
+
+  http_proxy:
+    type: string
+    description: "HTTP proxy URL"
+    default: ''
+
+  https_proxy:
+    type: string
+    description: "HTTPS proxy URL"
+    default: ''
+
+  no_proxy:
+    type: string
+    description: "Exceptions to proxy configuration"
+    default: ''
+
+  replica_set_name:
+    type: string
+    default: rs0
+
+resources:
+
+  # SOFTWARE CONFIGS
+
+  install_repo:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/1_install-repo.sh }
+      inputs:
+        - name: http_proxy
+        - name: https_proxy
+        - name: noproxy
+
+  install_mongodb:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/2_install.sh }
+      inputs:
+        - name: http_proxy
+        - name: https_proxy
+        - name: noproxy
+
+  configure_mongod:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/3_configure-mongod.sh }
+      inputs:
+        - name: BIND_IP
+        - name: BIND_PORT
+        - name: REPLICA_SET_NAME
+        - name: OPLOG_SIZE_MB
+  
+  start_mongodb:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/4_start-mongodb.sh }
+
+  bootstrap_mongodb:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/5_bootstrap-mongodb.sh }
+      inputs:
+        - name: REPLICA_SET_NAME
+        - name: BIND_PORT
+
+  join-secondaries:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/6_join-secondaries.sh }
+      inputs:
+        - name: NODE_NAMES
+          type: CommaDelimitedList
+        - name: BIND_PORT
+
+  create_admin:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/7_create-admin.sh }
+      inputs:
+        - name: ADMIN_PASS
+
+  lockdown:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/ubuntu/8_lockdown.sh }
+      inputs:
+        - name: MONGO_KEY
+  
+  # SOFTWARE DEPLOYMENTS
+
+  deploy_install_repo:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: install_repo }
+      servers: { get_param: server_map }
+      input_values:
+        http_proxy: { get_param: http_proxy }
+        https_proxy: { get_param: http_proxy }
+        no_proxy: { get_param: no_proxy }
+
+  deploy_install_mongodb:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: install_mongodb }
+      servers: { get_param: server_map }
+      input_values:
+        http_proxy: { get_param: http_proxy }
+        https_proxy: { get_param: http_proxy }
+        no_proxy: { get_param: no_proxy }
+    depends_on:
+      - deploy_install_repo
+  
+  deploy_configure_mongodb:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: configure_mongod }
+      servers: { get_param: server_map }
+      input_values:
+        BIND_IP: 0.0.0.0
+        BIND_PORT: 27017
+        REPLICA_SET_NAME: rs0
+        OPLOG_SIZE_MB: 10
+    depends_on:
+      - deploy_install_mongodb
+
+  deploy_start:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: start_mongodb }
+      servers: { get_param: server_map }
+    depends_on:
+      - deploy_configure_mongodb
+
+  deploy_bootstrap:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      config: { get_resource: bootstrap_mongodb }
+      server: { get_param: [ server_list, 0 ] }
+      input_values:
+        REPLICA_SET_NAME: rs0
+        BIND_PORT: 27017
+    depends_on:
+      - deploy_start
+
+  deploy_join-secondaries:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      config: { get_resource: join-secondaries }
+      server: { get_param: [ server_list, 0 ] }
+      input_values:
+        NODE_NAMES: { get_param: server_names }
+        BIND_PORT: 27017
+    depends_on:
+      - deploy_bootstrap
+
+  admin_password:
+    type: OS::Heat::RandomString
+
+  deploy_create_admin:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      config: { get_resource: create_admin }
+      server: { get_param: [ server_list, 0 ] }
+      input_values:
+        ADMIN_PASS: { get_resource: admin_password }
+    depends_on:
+      - deploy_join-secondaries
+
+  mongo_key:
+    type: OS::Heat::RandomString
+    properties:
+      length: 512
+
+  deploy_lockdown:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: lockdown }
+      servers: { get_param: server_map }
+      input_values:
+        MONGO_KEY: { get_resource: mongo_key }
+    depends_on:
+      - deploy_create_admin 
+
+outputs:
+
+  admin_password:
+    value: { get_resource: admin_password }

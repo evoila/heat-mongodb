@@ -1,0 +1,97 @@
+heat_template_version: 2015-04-30
+description: Create a new MongoDB User
+
+parameters:
+
+  server_map:
+    type: json
+    description: Map of servers to be used with OS::Heat::SoftwareDeploymentGroup
+
+  server_list:
+    type: comma_delimited_list
+    description: List of server IDs
+
+  server_names:
+    type: comma_delimited_list
+    description: List of server names
+
+  http_proxy:
+    type: string
+    description: "HTTP proxy URL"
+    default: ''
+
+  https_proxy:
+    type: string
+    description: "HTTPS proxy URL"
+    default: ''
+
+  no_proxy:
+    type: string
+    description: "Exceptions to proxy configuration"
+    default: ''
+
+  mongodb_port:
+    type: string
+    default: 27017
+
+  admin_user:
+    type: string
+    default: admin
+
+  admin_pass:
+    type: string
+    hidden: true
+
+  database:
+    type: string
+
+  username: 
+    type: string
+
+  password:
+    type: string
+    hidden: true
+
+  roles:
+    type: comma_delimited_list
+    default:
+      - readWrite
+      - dbAdmin
+
+resources:
+
+  # SOFTWARE CONFIGS
+
+  create_user:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: script
+      config: { get_file: scripts/create_user.sh }
+      inputs:
+        - name: MONGODB_PORT
+        - name: ADMIN_USER
+        - name: ADMIN_PASS
+        - name: DATABASE
+        - name: USERNAME
+        - name: PASSWORD
+        - name: ROLES
+          type: CommaDelimitedList
+
+
+  # SOFTWARE DEPLOYMENTS
+
+  deploy_create_user:
+    type: OS::Heat::SoftwareDeploymentGroup
+    properties:
+      config: { get_resource: create_user }
+      servers: { get_param: server_map }
+      input_values:
+        MONGODB_PORT: { get_param: mongodb_port }
+        ADMIN_USER: { get_param: admin_user }
+        ADMIN_PASS: { get_param: admin_pass }
+        DATABASE: { get_param: database }
+        USERNAME: { get_param: username }
+        PASSWORD: { get_param: password }
+        ROLES: { get_param: roles }
+
+outputs:

@@ -1,0 +1,5 @@
+resource_registry:
+  "Evoila::Deployment::MongoDB": src/deploy-mongodb-centos.yaml
+  "Evoila::Deployment::MongoDB::Client": src/deploy-mongo-client-centos.yaml
+  "Evoila::Deployment::MongoDB::Backup": src/deploy-mongodb-backup.yaml
+  "Evoila::Deployment::MongoDB::User": src/deploy-mongodb-user.yaml
