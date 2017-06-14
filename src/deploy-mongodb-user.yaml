@@ -85,6 +85,7 @@ resources:
     properties:
       config: { get_resource: create_user }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         MONGODB_PORT: { get_param: mongodb_port }
         ADMIN_USER: { get_param: admin_user }

@@ -117,6 +117,7 @@ resources:
     properties:
       config: { get_resource: install_repo }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         http_proxy: { get_param: http_proxy }
         https_proxy: { get_param: http_proxy }
@@ -127,6 +128,7 @@ resources:
     properties:
       config: { get_resource: install_mongodb }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         http_proxy: { get_param: http_proxy }
         https_proxy: { get_param: http_proxy }
@@ -139,6 +141,7 @@ resources:
     properties:
       config: { get_resource: configure_mongod }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         BIND_IP: 0.0.0.0
         BIND_PORT: 27017
@@ -152,6 +155,7 @@ resources:
     properties:
       config: { get_resource: start_mongodb }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
     depends_on:
       - deploy_configure_mongodb
 
@@ -160,6 +164,7 @@ resources:
     properties:
       config: { get_resource: bootstrap_mongodb }
       server: { get_param: [ server_list, 0 ] }
+      signal_transport: HEAT_SIGNAL
       input_values:
         REPLICA_SET_NAME: rs0
         BIND_PORT: 27017
@@ -171,6 +176,7 @@ resources:
     properties:
       config: { get_resource: join-secondaries }
       server: { get_param: [ server_list, 0 ] }
+      signal_transport: HEAT_SIGNAL
       input_values:
         NODE_NAMES: { get_param: server_names }
         BIND_PORT: 27017
@@ -185,6 +191,7 @@ resources:
     properties:
       config: { get_resource: create_admin }
       server: { get_param: [ server_list, 0 ] }
+      signal_transport: HEAT_SIGNAL
       input_values:
         ADMIN_PASS: { get_resource: admin_password }
     depends_on:
@@ -200,6 +207,7 @@ resources:
     properties:
       config: { get_resource: lockdown }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         MONGO_KEY: { get_resource: mongo_key }
     depends_on:

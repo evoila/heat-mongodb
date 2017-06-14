@@ -61,6 +61,7 @@ resources:
     properties:
       config: { get_resource: install_repo }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         http_proxy: { get_param: http_proxy }
         https_proxy: { get_param: http_proxy }
@@ -71,6 +72,7 @@ resources:
     properties:
       config: { get_resource: install_mongo_client }
       servers: { get_param: server_map }
+      signal_transport: HEAT_SIGNAL
       input_values:
         http_proxy: { get_param: http_proxy }
         https_proxy: { get_param: http_proxy }
