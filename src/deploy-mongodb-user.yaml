@@ -48,10 +48,6 @@ parameters:
   username: 
     type: string
 
-  password:
-    type: string
-    hidden: true
-
   roles:
     type: comma_delimited_list
     default:
@@ -80,6 +76,9 @@ resources:
 
   # SOFTWARE DEPLOYMENTS
 
+  password:
+    type: OS::Heat::RandomString
+
   deploy_create_user:
     type: OS::Heat::SoftwareDeploymentGroup
     properties:
@@ -92,7 +91,10 @@ resources:
         ADMIN_PASS: { get_param: admin_pass }
         DATABASE: { get_param: database }
         USERNAME: { get_param: username }
-        PASSWORD: { get_param: password }
+        PASSWORD: { get_resource: password }
         ROLES: { get_param: roles }
 
 outputs:
+
+  password:
+    value: { get_resource: password }
